@@ -1,42 +1,42 @@
 #!/usr/bin/python
 
+# ./read.py <host> <port> <name> [n]
+# Stream binary data from the table 'name' starting from chunk number 'n'
+
 from sys import argv
 from os import write
 import rethinkdb as r
 
-c = r.connect()
+conn = r.connect(argv[1], int(argv[2]))
 
-t = argv[1]
+table = argv[3]
+db_table = r.db('streams').table(table)
+
 try:
-    i = int(argv[2])
+    i = int(argv[4])
 except:
     i = None
 
 try:
-    r.table(t).info().run(c)
+    db_table.info().run(conn)
 except:
     i = 0
-    write(2, 'Waiting for table ' + t + '...')
+    write(2, 'Waiting for table ' + table + '...')
     (r.db('rethinkdb')
       .table('table_status')
-      .filter({'name':t})
+      .filter({'name': table, 'db': 'streams'})
       .changes()
-      .run(c)
+      .run(conn)
       .next())
-    r.table(t).wait().run(c)
+    db_table.wait().run(conn)
     write(2, ' found\n')
 
-if i is None:
-    def read():
-        for row in ():
-            if not 'end' in row:
-                yield row['chunk']
 def read():
     global i
     end = False
-    changes = r.table(t).changes()['new_val'].run(c)
+    changes = db_table.changes()['new_val'].run(conn)
     try:
-        ended = 'end' in r.table(t).max(index='id').run(c)
+        ended = 'end' in db_table.max(index='id').run(conn)
         if ended:
             changes.close()
     except:
@@ -46,10 +46,10 @@ def read():
     else:
         last_i = None
     if not i is None:
-        for row in (r.table(t)
+        for row in (db_table
                     .between(i, last_i, right_bound='closed')
                     .order_by(index= 'id')
-                    .run(c)):
+                    .run(conn)):
             i = row['id']
             if 'end' in row:
                 end = True

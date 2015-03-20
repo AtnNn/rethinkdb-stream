@@ -1,26 +1,35 @@
 #!/usr/bin/python
 
+# ./write.py <host> <port> <name>
+
+# Stream data into the table 'name' in 1k chunks
+
 from sys import argv
 from os import read
 from itertools import count
 import rethinkdb as r
 
-c = r.connect()
+conn = r.connect(argv[1], int(argv[2]))
 
-t = argv[1]
+table = argv[3]
 
 try:
-    r.table_drop(t).run(c)
+    r.db_create('streams').run(conn)
+except:
+    pass
+
+try:
+    r.db('streams').table_drop(table).run(conn)
 except r.errors.RqlError:
     pass
-r.table_create(t).run(c)
+r.db('streams').table_create(table).run(conn)
 
 try:
     for i in count():
-        data = read(0, 5 * 1024)
+        data = read(0, 1024)
         if not data:
             break
-        r.table(t).insert({'id': i, 'chunk': r.binary(data)}).run(c, durability='soft')
+        r.db('streams').table(table).insert({'id': i, 'chunk': r.binary(data)}).run(conn, durability='soft')
 finally:
-  r.table(t).insert({'id': i, 'end': True}).run(c, durability='soft')
+  r.db('streams').table(table).insert({'id': i, 'end': True}).run(conn, durability='soft')
 

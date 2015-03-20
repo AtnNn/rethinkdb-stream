@@ -1,1 +1,5 @@
-./read.py test | mplayer -cache 1000 -
+#!/bin/bash
+
+# ./play_video_stream <host> <port> <name>
+
+./read.py "$@" | mplayer -cache 1000 -
